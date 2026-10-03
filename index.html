@@ -6,6 +6,9 @@
 
     <title>Drawing Viewer</title>
 
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <style>
         * {
             box-sizing: border-box;
@@ -14,208 +17,218 @@
         body {
             margin: 0;
             font-family: Arial, sans-serif;
-            background: #101923;
-            color: white;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
+            background: #f2f4f7;
         }
 
-        /* Thanh trên */
-        .header {
+        header {
             height: 60px;
-            background: #162b3d;
+            background: #0b2a4a;
+            color: white;
             display: flex;
             align-items: center;
-            padding: 0 20px;
-        }
-
-        .header h2 {
-            margin: 0;
-            margin-right: 30px;
-        }
-
-        /* Nút chọn file */
-        .upload-btn {
-            background: #4da3d9;
-            color: white;
-            padding: 10px 18px;
-            border-radius: 6px;
-            cursor: pointer;
+            padding: 0 25px;
+            font-size: 20px;
             font-weight: bold;
         }
 
-        .upload-btn:hover {
-            background: #65b5e8;
-        }
-
-        #fileInput {
-            display: none;
-        }
-
-        /* Khu vực chính */
-        .main {
-            flex: 1;
+        .container {
             display: flex;
-            min-height: 0;
+            height: calc(100vh - 60px);
         }
 
-        /* Bên trái */
         .sidebar {
             width: 280px;
-            background: #142230;
-            border-right: 1px solid #33495c;
+            background: white;
             padding: 20px;
+            border-right: 1px solid #ddd;
         }
 
         .sidebar h3 {
             margin-top: 0;
         }
 
-        #fileName {
-            color: #66c7ff;
-            word-break: break-all;
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #0b2a4a;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 15px;
         }
 
-        /* Khu vực PDF */
+        button:hover {
+            background: #17466f;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        #fileName {
+            margin-top: 15px;
+            font-size: 14px;
+            word-break: break-word;
+            color: #444;
+        }
+
+        #status {
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
         .viewer {
             flex: 1;
-            background: #303030;
+            background: #ddd;
         }
 
-        #pdfViewer {
+        iframe {
             width: 100%;
             height: 100%;
             border: none;
-        }
-
-        .welcome {
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            color: #aaa;
-        }
-
-        .welcome h1 {
-            color: white;
         }
     </style>
 </head>
 
 <body>
 
-    <!-- HEADER -->
-    <div class="header">
+<header>
+    DRAWING VIEWER
+</header>
 
-        <h2>📐 DRAWING VIEWER</h2>
+<div class="container">
 
-        <label class="upload-btn">
-            📂 Chọn bản vẽ PDF
+    <div class="sidebar">
 
-            <input
-                type="file"
-                id="fileInput"
-                accept=".pdf"
-            >
-        </label>
+        <h3>Thông tin bản vẽ</h3>
+
+        <button onclick="document.getElementById('fileInput').click()">
+            Chọn bản vẽ PDF
+        </button>
+
+        <input
+            type="file"
+            id="fileInput"
+            accept=".pdf"
+            onchange="uploadPDF(this.files[0])"
+        >
+
+        <div id="fileName">
+            Chưa chọn bản vẽ
+        </div>
+
+        <div id="status"></div>
 
     </div>
 
+    <div class="viewer">
 
-    <!-- MAIN -->
-    <div class="main">
-
-        <!-- SIDEBAR -->
-        <div class="sidebar">
-
-            <h3>Thông tin bản vẽ</h3>
-
-            <p>File đang xem:</p>
-
-            <p id="fileName">
-                Chưa chọn bản vẽ
-            </p>
-
-        </div>
-
-
-        <!-- PDF VIEWER -->
-        <div class="viewer">
-
-            <div class="welcome" id="welcome">
-
-                <div>
-
-                    <h1>Drawing Viewer</h1>
-
-                    <p>
-                        Bấm "Chọn bản vẽ PDF" để mở bản vẽ
-                    </p>
-
-                </div>
-
-            </div>
-
-
-            <iframe
-                id="pdfViewer"
-                style="display: none;"
-            ></iframe>
-
-        </div>
+        <iframe id="pdfViewer"></iframe>
 
     </div>
 
+</div>
 
-    <script>
+<script>
 
-        const fileInput = document.getElementById("fileInput");
+    // ==========================================
+    // SUPABASE CONFIG
+    // ==========================================
 
-        const pdfViewer = document.getElementById("pdfViewer");
+    const SUPABASE_URL = "https://thqxkfuvcrklkhasewzi.supabase.co";
 
-        const welcome = document.getElementById("welcome");
-
-        const fileName = document.getElementById("fileName");
-
-
-        fileInput.addEventListener("change", function () {
-
-            const file = this.files[0];
-
-            if (!file) {
-                return;
-            }
+    const SUPABASE_KEY = "sb_publishable_wt0QuAO9wkqYLwJFEcIHbQ_0t_FQJ3q";
 
 
-            // Kiểm tra PDF
-            if (file.type !== "application/pdf") {
-
-                alert("Vui lòng chọn file PDF!");
-
-                return;
-            }
+    const supabaseClient = window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_KEY
+    );
 
 
-            // Hiển thị tên file
-            fileName.textContent = file.name;
+    // ==========================================
+    // UPLOAD PDF
+    // ==========================================
+
+    async function uploadPDF(file) {
+
+        if (!file) {
+            return;
+        }
+
+        // Chỉ cho phép PDF
+        if (file.type !== "application/pdf") {
+
+            alert("Vui lòng chọn file PDF.");
+
+            return;
+        }
 
 
-            // Tạo đường dẫn tạm tới file PDF
-            const fileURL = URL.createObjectURL(file);
+        const fileName = file.name;
+
+        document.getElementById("fileName").innerText =
+            "Đang upload: " + fileName;
+
+        document.getElementById("status").innerText =
+            "Đang upload lên Supabase...";
 
 
-            // Hiển thị PDF
-            pdfViewer.src = fileURL;
+        // Tạo tên file duy nhất
+        const filePath =
+            Date.now() + "_" + fileName;
 
-            pdfViewer.style.display = "block";
 
-            welcome.style.display = "none";
+        // Upload vào bucket drawings
+        const { data, error } = await supabaseClient
+            .storage
+            .from("drawings")
+            .upload(filePath, file, {
+                contentType: "application/pdf",
+                upsert: false
+            });
 
-        });
 
-    </script>
+        // Nếu upload lỗi
+        if (error) {
+
+            console.error(error);
+
+            document.getElementById("status").innerText =
+                "Upload lỗi: " + error.message;
+
+            return;
+        }
+
+
+        // Lấy URL của file
+        const { data: publicURL } =
+            supabaseClient
+                .storage
+                .from("drawings")
+                .getPublicUrl(filePath);
+
+
+        const pdfURL = publicURL.publicUrl;
+
+
+        console.log("PDF URL:", pdfURL);
+
+
+        // Hiển thị PDF
+        document.getElementById("pdfViewer").src = pdfURL;
+
+
+        document.getElementById("fileName").innerText =
+            fileName;
+
+        document.getElementById("status").innerText =
+            "Upload thành công ✓";
+
+    }
+
+</script>
 
 </body>
 </html>
